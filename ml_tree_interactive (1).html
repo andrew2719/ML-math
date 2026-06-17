@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The ML Tree — complete & interactive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FCFBF9; --panel:#FFFFFF; --ink:#23281f; --muted:#6f7268;
+    --line:#e7e3da; --accent:#2c6e54; --canvas:#fbfbf8;
+    --core:#2c6e54; --common:#2563eb; --spec:#b45309; --adv:#6d28d9;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{padding:18px clamp(16px,4vw,32px) 14px; border-bottom:1px solid var(--line); background:var(--panel)}
+  .kicker{font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 4px}
+  h1{font-family:'Fraunces',Georgia,serif; font-weight:500; font-size:clamp(22px,3.4vw,30px); margin:0; letter-spacing:-.01em}
+  h1 em{font-style:italic; color:var(--accent)}
+  .sub{font-size:13.5px; color:var(--muted); margin:6px 0 0}
+
+  .bar{display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:12px clamp(16px,4vw,32px); border-bottom:1px solid var(--line); background:var(--panel)}
+  .btns{display:flex; gap:8px}
+  .btn{appearance:none; border:1px solid var(--line); background:#fff; color:var(--ink); font:inherit; font-size:13px; font-weight:500; padding:7px 13px; border-radius:9px; cursor:pointer}
+  .btn:hover{border-color:var(--accent); color:var(--accent)}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 16px; margin-left:auto}
+  .lg{display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink)}
+  .lg .d{width:9px; height:9px; border-radius:50%}
+  .hint{font-size:12.5px; color:var(--muted)}
+
+  #canvas{flex:1 1 auto; min-height:0; background:var(--canvas); position:relative}
+  #canvas svg{width:100%; height:100%; display:block; cursor:grab}
+  #canvas svg:active{cursor:grabbing}
+
+  .link{fill:none; stroke:#cfd8ce; stroke-width:1.4px}
+  .node{cursor:pointer}
+  .node.leaf,.node.root{cursor:default}
+  .node circle{stroke-width:2px; transition:r .15s ease}
+  .node:hover circle{r:8}
+  .node.leaf:hover circle{r:6}
+  .node text{font-size:13px; fill:var(--ink); paint-order:stroke; stroke:var(--canvas); stroke-width:3px; stroke-linejoin:round}
+  .node.branch text{font-weight:600}
+  .node.root text{font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:16px}
+
+  .fallback{position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; padding:40px; color:var(--muted); font-size:15px}
+
+  @media (max-width:560px){ .legend{margin-left:0; width:100%} .hint{display:none} }
+  @media (prefers-reduced-motion:reduce){ .node circle{transition:none} }
+</style>
+</head>
+<body>
+  <header>
+    <p class="kicker">A field guide · complete map</p>
+    <h1>The <em>Machine Learning</em> tree</h1>
+    <p class="sub">Click a node to grow or prune its branch (it opens one level at a time) · drag to pan · scroll to zoom. Colour = <strong>when to learn it</strong>.</p>
+  </header>
+
+  <div class="bar">
+    <div class="btns">
+      <button class="btn" id="expandAll">Grow all</button>
+      <button class="btn" id="collapseAll">Prune all</button>
+      <button class="btn" id="resetView">Fit to screen</button>
+    </div>
+    <div class="legend">
+      <span class="lg"><span class="d" style="background:var(--core)"></span>learn first</span>
+      <span class="lg"><span class="d" style="background:var(--common)"></span>as needed</span>
+      <span class="lg"><span class="d" style="background:var(--spec)"></span>specialized</span>
+      <span class="lg"><span class="d" style="background:var(--adv)"></span>deep learning</span>
+    </div>
+  </div>
+
+  <div id="canvas">
+    <div class="fallback" id="fallback">Couldn't load the tree library (needs an internet connection the first time). Open this file again while online, and it'll render.</div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const DATA = {
+  name: "Machine Learning",
+  children: [
+
+    { name: "0 · The workflow", note:"the process wrapping every project", children: [
+      { name:"Frame the problem", p:"core", note:"predict what? supervised/unsupervised? define success" },
+      { name:"Get the data", p:"core", note:"SQL, files, APIs, scraping" },
+      { name:"Explore it (EDA)", p:"core", note:"distributions, correlations, missing, outliers" },
+      { name:"Clean it", p:"core", note:"missing values, duplicates, types — about 60% of the real job" },
+      { name:"Preprocess & engineer features", p:"core", note:"scale, encode, transform, create" },
+      { name:"Split the data", p:"core", note:"train / validation / test" },
+      { name:"Choose a model", p:"core", note:"based on problem type + data shape" },
+      { name:"Train it", p:"core", note:"the model learns the rules from examples" },
+      { name:"Evaluate it", p:"core", note:"on data it never saw" },
+      { name:"Tune & improve", p:"core", note:"hyperparameters, regularization, ensembles" },
+      { name:"Deploy", p:"common", note:"serve via an API (FastAPI, Docker)" },
+      { name:"Monitor & maintain", p:"common", note:"watch for data drift, retrain" }
+    ]},
+
+    { name: "1 · Problem types & models", note:"the first fork — pick by your data, then drill to the model", children: [
+      { name:"Supervised", note:"you have labeled answers", children: [
+
+        { name:"Regression", note:"predict a number (price, temperature)", children: [
+          { name:"Linear Regression", p:"core", note:"the foundation; 'sum of effects + Normal noise'" },
+          { name:"Polynomial Regression", p:"common", note:"curved relationships" },
+          { name:"Ridge (L2)", p:"core", note:"shrinks weights; handles correlated features" },
+          { name:"Lasso (L1)", p:"core", note:"shrinks AND drops features" },
+          { name:"Elastic Net", p:"common", note:"blend of Ridge + Lasso" },
+          { name:"GLMs", note:"generalized linear models for non-Normal targets", children:[
+            { name:"Poisson regression", p:"common", note:"count targets" },
+            { name:"Gamma regression", p:"common", note:"positive, skewed targets" }
+          ]},
+          { name:"Decision Tree Regressor", p:"core", note:"if/else splits" },
+          { name:"Random Forest Regressor", p:"core", note:"many trees averaged (bagging)" },
+          { name:"Gradient Boosting", note:"trees built sequentially — the tabular workhorse", children:[
+            { name:"XGBoost", p:"core", note:"the classic" },
+            { name:"LightGBM", p:"core", note:"fast, large data" },
+            { name:"CatBoost", p:"core", note:"great with categoricals" }
+          ]},
+          { name:"KNN Regressor", p:"common", note:"average of nearest neighbors" },
+          { name:"SVR", p:"common", note:"support vector regression" },
+          { name:"Survival models", note:"time-to-event ('when will it happen')", children:[
+            { name:"Cox Proportional Hazards", p:"spec", note:"" },
+            { name:"Weibull / AFT", p:"spec", note:"" }
+          ]}
+        ]},
+
+        { name:"Classification", note:"predict a category (binary, multiclass, multilabel)", children: [
+          { name:"Logistic Regression", p:"core", note:"the yes/no foundation; 'Binomial' story" },
+          { name:"Softmax / Multinomial LR", p:"common", note:"multiclass logistic" },
+          { name:"K-Nearest Neighbors", p:"core", note:"you're like your neighbors" },
+          { name:"Naive Bayes", note:"fast, great for text", children:[
+            { name:"Gaussian NB", p:"common", note:"continuous features" },
+            { name:"Multinomial NB", p:"common", note:"word counts" },
+            { name:"Bernoulli NB", p:"common", note:"binary features" }
+          ]},
+          { name:"Support Vector Machine", note:"max-margin separator", children:[
+            { name:"Linear kernel", p:"common", note:"" },
+            { name:"RBF kernel", p:"common", note:"non-linear" },
+            { name:"Polynomial kernel", p:"common", note:"" }
+          ]},
+          { name:"Decision Tree", p:"core", note:"if/else splits" },
+          { name:"Random Forest", p:"core", note:"many trees voting (bagging)" },
+          { name:"Gradient Boosting", note:"sequential trees — workhorse", children:[
+            { name:"XGBoost", p:"core", note:"" },
+            { name:"LightGBM", p:"core", note:"" },
+            { name:"CatBoost", p:"core", note:"" },
+            { name:"AdaBoost", p:"common", note:"the original boosting" }
+          ]},
+          { name:"Discriminant Analysis", note:"projects data to separate classes", children:[
+            { name:"LDA", p:"common", note:"linear; also reduces dimensions" },
+            { name:"QDA", p:"common", note:"quadratic boundaries" }
+          ]}
+        ]},
+
+        { name:"Ensemble methods", note:"how models combine to do better", children:[
+          { name:"Bagging", p:"core", note:"parallel; reduces variance (Random Forest)" },
+          { name:"Boosting", p:"core", note:"sequential; reduces bias (XGB/LGBM/Cat/Ada)" },
+          { name:"Stacking / Voting", p:"common", note:"blend different model types" }
+        ]}
+      ]},
+
+      { name:"Unsupervised", note:"no labels — discover structure", children: [
+
+        { name:"Clustering", note:"group similar items", children:[
+          { name:"K-Means", p:"core", note:"centroid-based (++ and mini-batch variants)" },
+          { name:"Choosing K", note:"how many clusters? (no single right answer)", children:[
+            { name:"Elbow method", p:"core", note:"the WCSS bend" },
+            { name:"Silhouette score", p:"core", note:"separation quality" },
+            { name:"Davies-Bouldin", p:"common", note:"lower = better" },
+            { name:"Calinski-Harabasz", p:"common", note:"higher = better" },
+            { name:"Gap statistic", p:"spec", note:"" }
+          ]},
+          { name:"Hierarchical / Agglomerative", p:"common", note:"dendrograms, no preset K" },
+          { name:"DBSCAN / HDBSCAN", p:"common", note:"density-based; handles noise" },
+          { name:"Gaussian Mixture (GMM)", p:"common", note:"soft, probabilistic" },
+          { name:"Spectral Clustering", p:"spec", note:"graph-based" },
+          { name:"Mean Shift", p:"spec", note:"" }
+        ]},
+
+        { name:"Dimensionality reduction", note:"compress / visualize", children:[
+          { name:"Linear", note:"new axes are weighted blends of features", children:[
+            { name:"PCA", p:"core", note:"variance-max axes (the one you know)" },
+            { name:"Kernel PCA", p:"common", note:"non-linear PCA" },
+            { name:"LDA", p:"common", note:"supervised; maximizes class separation" },
+            { name:"Factor Analysis", p:"spec", note:"" },
+            { name:"ICA", p:"spec", note:"independent component analysis" }
+          ]},
+          { name:"Non-linear / manifold", note:"mostly for visualization", children:[
+            { name:"t-SNE", p:"common", note:"beautiful 2D/3D cluster views" },
+            { name:"UMAP", p:"common", note:"faster; keeps global structure" },
+            { name:"Isomap", p:"spec", note:"" },
+            { name:"LLE", p:"spec", note:"locally linear embedding" },
+            { name:"Autoencoders", p:"adv", note:"neural-net-based" }
+          ]}
+        ]},
+
+        { name:"Association rules", note:"market basket; support, confidence, lift", children:[
+          { name:"Apriori", p:"spec", note:"" },
+          { name:"FP-Growth", p:"spec", note:"" }
+        ]},
+
+        { name:"Anomaly detection", note:"find the weird points", children:[
+          { name:"Isolation Forest", p:"common", note:"" },
+          { name:"One-Class SVM", p:"common", note:"" },
+          { name:"Local Outlier Factor (LOF)", p:"common", note:"" }
+        ]}
+      ]},
+
+      { name:"Other paradigms", children:[
+        { name:"Semi-supervised", p:"common", note:"some labels, mostly unlabeled" },
+        { name:"Self-supervised", p:"adv", note:"labels from the data itself; powers LLMs" },
+        { name:"Reinforcement learning", note:"learn by reward / trial and error", children:[
+          { name:"Q-learning", p:"spec", note:"" },
+          { name:"Policy gradients", p:"spec", note:"" },
+          { name:"Deep RL", p:"spec", note:"DQN, PPO, etc." }
+        ]}
+      ]}
+    ]},
+
+    { name: "2 · Data & preprocessing", note:"where most of the real work lives", children: [
+      { name:"Understanding data (EDA)", children:[
+        { name:"Descriptive stats", p:"core", note:"mean, median, std, quantiles" },
+        { name:"Probability distributions", note:"a column's shape → tells you transforms & models", children:[
+          { name:"Discrete", note:"countable outcomes (0,1,2,…)", children:[
+            { name:"Bernoulli", p:"common", note:"single yes/no trial" },
+            { name:"Binomial", p:"common", note:"successes in n trials (→ logistic regression)" },
+            { name:"Hypergeometric", p:"common", note:"successes without replacement" },
+            { name:"Geometric", p:"common", note:"trials until first success" },
+            { name:"Negative Binomial", p:"common", note:"overdispersed counts" },
+            { name:"Poisson", p:"common", note:"event counts per window (→ Poisson regression)" },
+            { name:"Multinomial", p:"common", note:"counts across categories" }
+          ]},
+          { name:"Continuous", note:"any value on a range", children:[
+            { name:"Uniform", p:"common", note:"flat; equal chance everywhere" },
+            { name:"Normal (Gaussian)", p:"core", note:"the bell curve (→ linear regression)" },
+            { name:"Log-normal", p:"common", note:"right-skewed; income, prices (→ log-transform)" },
+            { name:"Exponential", p:"common", note:"time between events (→ survival)" },
+            { name:"Gamma", p:"common", note:"positive, flexible shape" },
+            { name:"Beta", p:"spec", note:"proportions in [0,1]" },
+            { name:"Student's t", p:"common", note:"heavy-tailed; small samples" },
+            { name:"Chi-square", p:"spec", note:"variance / statistical tests" }
+          ]}
+        ]},
+        { name:"Correlation", p:"core", note:"Pearson, Spearman, heatmaps" },
+        { name:"Visualization", p:"core", note:"histograms, box plots, scatter, pair plots" }
+      ]},
+      { name:"Cleaning", children:[
+        { name:"Missing values", p:"core", note:"drop, mean/median/mode, KNN imputer" },
+        { name:"Outliers", p:"core", note:"IQR, z-score → keep / cap / remove" },
+        { name:"Duplicates, types, categories", p:"core", note:"" }
+      ]},
+      { name:"Scaling & encoding", children:[
+        { name:"Standardization (z-score)", p:"core", note:"mean 0, std 1; for distance/gradient models" },
+        { name:"Normalization (min-max)", p:"core", note:"scale to [0,1]" },
+        { name:"Robust scaling", p:"common", note:"uses median / IQR" },
+        { name:"One-hot encoding", p:"core", note:"categories → 0/1 columns" },
+        { name:"Label / ordinal encoding", p:"common", note:"" },
+        { name:"Target / frequency encoding", p:"common", note:"" }
+      ]},
+      { name:"Transformations", children:[
+        { name:"Log / log1p", p:"core", note:"tame right-skewed positives" },
+        { name:"Box-Cox", p:"common", note:"positive data → Normal" },
+        { name:"Yeo-Johnson", p:"common", note:"handles negatives too (PowerTransformer)" }
+      ]},
+      { name:"Feature engineering & selection", children:[
+        { name:"Creating features", p:"core", note:"ratios, dates→parts, domain knowledge (biggest wins)" },
+        { name:"Binning, polynomial, interactions", p:"common", note:"" },
+        { name:"Feature selection", note:"keep / drop columns", children:[
+          { name:"Filter (correlation, variance, chi²)", p:"common", note:"" },
+          { name:"Wrapper (RFE)", p:"common", note:"" },
+          { name:"Embedded (Lasso, tree importance)", p:"common", note:"" }
+        ]}
+      ]},
+      { name:"Imbalanced data", children:[
+        { name:"Resampling (SMOTE, undersampling)", p:"common", note:"" },
+        { name:"Class weights", p:"common", note:"" },
+        { name:"Threshold tuning", p:"common", note:"" }
+      ]}
+    ]},
+
+    { name: "3 · Evaluation & validation", note:"how you know it's actually good", children: [
+      { name:"Validation strategy", children:[
+        { name:"Train / val / test split", p:"core", note:"" },
+        { name:"Cross-validation", p:"core", note:"k-fold, stratified, leave-one-out" },
+        { name:"Time-series split", p:"common", note:"never shuffle temporal data" },
+        { name:"Bootstrap", p:"common", note:"resampling for uncertainty" }
+      ]},
+      { name:"Regression metrics", children:[
+        { name:"MAE", p:"core", note:"mean absolute error" },
+        { name:"MSE / RMSE", p:"core", note:"penalizes big errors" },
+        { name:"R² / Adjusted R²", p:"core", note:"variance explained" },
+        { name:"MAPE", p:"common", note:"percentage error" }
+      ]},
+      { name:"Classification metrics", children:[
+        { name:"Confusion matrix", p:"core", note:"what kind of mistakes" },
+        { name:"Accuracy", p:"core", note:"careful with imbalance" },
+        { name:"Precision", p:"core", note:"of predicted-positive, how many right" },
+        { name:"Recall", p:"core", note:"of actual-positive, how many caught" },
+        { name:"F1 score", p:"core", note:"balance of precision & recall" },
+        { name:"ROC / AUC", p:"common", note:"" },
+        { name:"PR curve", p:"common", note:"" },
+        { name:"Log loss", p:"common", note:"" }
+      ]},
+      { name:"Clustering metrics", children:[
+        { name:"Silhouette", p:"common", note:"" },
+        { name:"Davies-Bouldin", p:"common", note:"" },
+        { name:"Calinski-Harabasz", p:"common", note:"" },
+        { name:"Adjusted Rand Index", p:"spec", note:"needs ground truth" },
+        { name:"NMI", p:"spec", note:"" }
+      ]},
+      { name:"Concepts that matter most", note:"learn these deeply", children:[
+        { name:"Overfitting vs underfitting", p:"core", note:"" },
+        { name:"Bias-variance tradeoff", p:"core", note:"" },
+        { name:"Generalization", p:"core", note:"unseen data, not training data" },
+        { name:"Data leakage", p:"core", note:"the silent killer" }
+      ]}
+    ]},
+
+    { name: "4 · Improving a model", children: [
+      { name:"Hyperparameter tuning", note:"finding the best settings", children:[
+        { name:"Grid search", p:"core", note:"" },
+        { name:"Random search", p:"core", note:"" },
+        { name:"Bayesian optimization", p:"common", note:"Optuna" }
+      ]},
+      { name:"Regularization", p:"core", note:"L1/L2, dropout, early stopping" },
+      { name:"Ensembling", p:"core", note:"bagging / boosting / stacking" },
+      { name:"Pipelines", p:"core", note:"sklearn Pipeline: preprocessing + model as one object" },
+      { name:"More feature engineering", p:"common", note:"usually the highest-leverage move" }
+    ]},
+
+    { name: "5 · Deep learning", note:"your fall class — same pipeline, new model box", children: [
+      { name:"Foundations", children:[
+        { name:"Neuron, layer, weights, biases", p:"adv", note:"" },
+        { name:"Activation functions", note:"add non-linearity", children:[
+          { name:"ReLU", p:"adv", note:"the default" },
+          { name:"Sigmoid", p:"adv", note:"0–1 output" },
+          { name:"Tanh", p:"adv", note:"-1 to 1" },
+          { name:"Softmax", p:"adv", note:"multiclass probabilities" },
+          { name:"Leaky ReLU", p:"adv", note:"" }
+        ]},
+        { name:"Forward pass & loss", p:"adv", note:"" },
+        { name:"Backpropagation", p:"adv", note:"how gradients flow back" },
+        { name:"Gradient descent", note:"the learning step", children:[
+          { name:"SGD", p:"adv", note:"" },
+          { name:"Adam", p:"adv", note:"the common default" }
+        ]},
+        { name:"Epochs, batches, learning rate", p:"adv", note:"" }
+      ]},
+      { name:"Architectures", children:[
+        { name:"MLP / Feedforward", p:"adv", note:"tabular" },
+        { name:"CNN", p:"adv", note:"images" },
+        { name:"RNN / LSTM / GRU", p:"adv", note:"sequences" },
+        { name:"Transformers", p:"adv", note:"attention; powers today's LLMs" },
+        { name:"Generative", children:[
+          { name:"Autoencoders", p:"adv", note:"" },
+          { name:"GANs", p:"adv", note:"" },
+          { name:"Diffusion models", p:"adv", note:"image generation" }
+        ]}
+      ]},
+      { name:"Frameworks & practice", children:[
+        { name:"PyTorch", p:"adv", note:"the default" },
+        { name:"TensorFlow / Keras", p:"adv", note:"" },
+        { name:"Transfer learning & fine-tuning", p:"adv", note:"" },
+        { name:"Dropout, batch norm, augmentation", p:"adv", note:"" },
+        { name:"GPUs", p:"adv", note:"" }
+      ]}
+    ]},
+
+    { name: "6 · Specialized areas", note:"visit only when your work needs it", children: [
+      { name:"Natural Language Processing", note:"text & language", children:[
+        { name:"Tokenization, embeddings", p:"spec", note:"" },
+        { name:"Transformers, LLMs", p:"spec", note:"" },
+        { name:"RAG (retrieval-augmented generation)", p:"spec", note:"" }
+      ]},
+      { name:"Computer Vision", p:"spec", note:"CNNs, object detection, segmentation" },
+      { name:"Time Series", note:"data over time", children:[
+        { name:"ARIMA", p:"spec", note:"" },
+        { name:"Prophet", p:"spec", note:"" },
+        { name:"LSTM forecasting", p:"spec", note:"" }
+      ]},
+      { name:"Recommender Systems", p:"spec", note:"collaborative filtering, matrix factorization" },
+      { name:"Graph & networks", note:"relationships between entities", children:[
+        { name:"PageRank", p:"spec", note:"" },
+        { name:"Community detection (Louvain, Girvan-Newman)", p:"spec", note:"" },
+        { name:"SimRank, TrustRank", p:"spec", note:"" },
+        { name:"Graph neural networks", p:"spec", note:"" }
+      ]},
+      { name:"Reinforcement Learning", p:"spec", note:"Q-learning, policy gradients, deep RL" },
+      { name:"MLOps / Production", note:"shipping & maintaining models", children:[
+        { name:"Docker, FastAPI", p:"common", note:"" },
+        { name:"MLflow / W&B", p:"common", note:"experiment tracking" },
+        { name:"Monitoring & drift", p:"common", note:"" },
+        { name:"DVC", p:"common", note:"data versioning" }
+      ]}
+    ]},
+
+    { name: "+ · Statistical foundations", note:"the math under the hood — eventually, not first", children: [
+      { name:"Probability distributions", note:"the shapes of randomness (same set as Data → EDA)", children:[
+        { name:"Discrete", children:[
+          { name:"Bernoulli", p:"common", note:"" },
+          { name:"Binomial", p:"common", note:"" },
+          { name:"Hypergeometric", p:"common", note:"" },
+          { name:"Geometric", p:"common", note:"" },
+          { name:"Negative Binomial", p:"common", note:"" },
+          { name:"Poisson", p:"common", note:"" },
+          { name:"Multinomial", p:"common", note:"" }
+        ]},
+        { name:"Continuous", children:[
+          { name:"Uniform", p:"common", note:"" },
+          { name:"Normal (Gaussian)", p:"common", note:"" },
+          { name:"Log-normal", p:"common", note:"" },
+          { name:"Exponential", p:"common", note:"" },
+          { name:"Gamma", p:"common", note:"" },
+          { name:"Beta", p:"spec", note:"" },
+          { name:"Student's t", p:"common", note:"" },
+          { name:"Chi-square", p:"spec", note:"" }
+        ]}
+      ]},
+      { name:"Parameter estimation", note:"finding a distribution's parameters from data", children:[
+        { name:"Maximum Likelihood (MLE)", p:"common", note:"the workhorse" },
+        { name:"Maximum A Posteriori (MAP)", p:"common", note:"MLE + a prior" },
+        { name:"Method of Moments", p:"spec", note:"" }
+      ]},
+      { name:"Distribution-free / non-parametric", p:"spec", note:"" },
+      { name:"Bayesian vs Frequentist", p:"spec", note:"" },
+      { name:"Hypothesis testing & confidence intervals", p:"spec", note:"" },
+      { name:"Multivariate Analysis (MVA)", p:"spec", note:"umbrella: PCA, factor analysis, MANOVA…" }
+    ]}
+  ]
+};
+
+(function(){
+  if(typeof d3 === 'undefined'){ document.getElementById('fallback').style.display='flex'; return; }
+
+  const PCOL = { core:'#2c6e54', common:'#2563eb', spec:'#b45309', adv:'#6d28d9' };
+  const ACCENT = '#2c6e54';
+  const canvas = document.getElementById('canvas');
+  let width = canvas.clientWidth, height = canvas.clientHeight;
+
+  const dx = 21;   // vertical gap between siblings
+  const dy = 240;  // horizontal gap between depths
+  const tree = d3.tree().nodeSize([dx, dy]);
+  const diagonal = d3.linkHorizontal().x(d => d.y).y(d => d.x);
+
+  const svg = d3.select('#canvas').append('svg').attr('viewBox', [0, 0, width, height]);
+  const g = svg.append('g');
+  const gLink = g.append('g').attr('class','links');
+  const gNode = g.append('g').attr('class','nodes');
+
+  const zoom = d3.zoom().scaleExtent([0.1, 2.4]).on('zoom', (e)=> g.attr('transform', e.transform));
+  svg.call(zoom);
+
+  const root = d3.hierarchy(DATA);
+  root.x0 = 0; root.y0 = 0;
+  let _id = 0;
+  root.descendants().forEach(d=>{ d.id = ++_id; });
+  if(root.children) root.children.forEach(collapseDeep);
+
+  function collapseDeep(d){
+    const kids = d.children || d._children;
+    if(kids){ d._children = kids; d.children = null; kids.forEach(collapseDeep); }
+  }
+  function isLeaf(d){ return !d.children && !d._children; }
+  function nodeClass(d){ return d.depth===0 ? 'node root' : (isLeaf(d) ? 'node leaf' : 'node branch'); }
+  function fill(d){
+    if(d.depth === 0) return ACCENT;
+    if(isLeaf(d)) return PCOL[d.data.p] || '#9aa0a6';
+    return d._children ? ACCENT : '#ffffff';
+  }
+  function stroke(d){
+    if(d.depth === 0) return ACCENT;
+    if(isLeaf(d)) return PCOL[d.data.p] || '#9aa0a6';
+    return ACCENT;
+  }
+
+  function update(source){
+    const dur = 250;
+    const nodes = root.descendants();
+    const links = root.links();
+    tree(root);
+
+    const node = gNode.selectAll('g.node').data(nodes, d=>d.id);
+
+    const nodeEnter = node.enter().append('g')
+        .attr('class', nodeClass)
+        .attr('transform', `translate(${source.y0},${source.x0})`)
+        .attr('opacity', 0)
+        .on('click', (event, d)=>{
+          if(isLeaf(d) || d.depth === 0) return;
+          d.children = d.children ? null : d._children;
+          update(d);
+        });
+
+    nodeEnter.append('circle')
+        .attr('r', d=> d.depth===0 ? 7 : (isLeaf(d) ? 4.5 : 6))
+        .attr('fill', fill)
+        .attr('stroke', stroke);
+
+    nodeEnter.append('text')
+        .attr('dy', '0.32em')
+        .attr('x', d=> (d.depth!==0 && !isLeaf(d)) ? -11 : 11)
+        .attr('text-anchor', d=> (d.depth!==0 && !isLeaf(d)) ? 'end' : 'start')
+        .text(d=> d.data.name)
+        .append('title')
+        .text(d=> d.data.note || d.data.name);
+
+    nodeEnter.merge(node).transition().duration(dur)
+        .attr('transform', d=> `translate(${d.y},${d.x})`)
+        .attr('opacity', 1);
+    nodeEnter.merge(node).select('circle').attr('fill', fill);
+
+    node.exit().transition().duration(dur)
+        .attr('transform', `translate(${source.y},${source.x})`)
+        .attr('opacity', 0).remove();
+
+    const link = gLink.selectAll('path.link').data(links, d=> d.target.id);
+
+    const linkEnter = link.enter().append('path').attr('class','link')
+        .attr('d', ()=>{ const o={x:source.x0, y:source.y0}; return diagonal({source:o, target:o}); });
+
+    linkEnter.merge(link).transition().duration(dur).attr('d', diagonal);
+
+    link.exit().transition().duration(dur)
+        .attr('d', ()=>{ const o={x:source.x, y:source.y}; return diagonal({source:o, target:o}); })
+        .remove();
+
+    root.eachBefore(d=>{ d.x0 = d.x; d.y0 = d.y; });
+  }
+
+  function fitView(animate){
+    tree(root);
+    const nodes = root.descendants();
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    nodes.forEach(d=>{ if(d.x<minX)minX=d.x; if(d.x>maxX)maxX=d.x; if(d.y<minY)minY=d.y; if(d.y>maxY)maxY=d.y; });
+    const padX = 80, labelRoom = 280;
+    const treeW = (maxY - minY) + labelRoom;
+    const treeH = (maxX - minX) + 60;
+    const k = Math.max(0.1, Math.min((width - 2*padX)/treeW, (height)/treeH, 1.15));
+    const tx = padX - minY*k;
+    const ty = (height - (minX+maxX)*k)/2;
+    const t = d3.zoomIdentity.translate(tx, ty).scale(k);
+    if(animate) svg.transition().duration(450).call(zoom.transform, t);
+    else svg.call(zoom.transform, t);
+  }
+
+  function expandAll(){ root.each(d=>{ if(d._children){ d.children = d._children; } }); update(root); fitView(true); }
+  function pruneAll(){ if(root.children) root.children.forEach(collapseDeep); update(root); fitView(true); }
+
+  document.getElementById('expandAll').addEventListener('click', expandAll);
+  document.getElementById('collapseAll').addEventListener('click', pruneAll);
+  document.getElementById('resetView').addEventListener('click', ()=> fitView(true));
+
+  window.addEventListener('resize', ()=>{
+    width = canvas.clientWidth; height = canvas.clientHeight;
+    svg.attr('viewBox', [0,0,width,height]); fitView(false);
+  });
+
+  update(root);
+  fitView(false);
+})();
+</script>
+</body>
+</html>
